@@ -16,20 +16,56 @@ import {
   Check,
   ArrowUpRight,
   BookOpen,
+  FileText,
   Command,
   ChevronRight,
   Filter,
   Sparkles,
-  Hash
+  Hash,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 
-type View = 'Dashboard' | 'Favourites' | 'Recently viewed' | string;
+type View = 'Dashboard' | 'Favourites' | 'Recently viewed' | 'Handbooks' | string;
 
-// Safely convert any value into displayable text.
+const handbooks = [
+  {
+    title: 'Excel Handbook',
+    description: 'Learn Excel formulas, functions, data cleaning, lookup techniques and reporting.',
+    category: 'Spreadsheet & Analysis',
+    file: '/handbooks/excel-handbook.pdf'
+  },
+  {
+    title: 'SQL Handbook',
+    description: 'Revise SQL queries, joins, filtering, grouping, subqueries and database concepts.',
+    category: 'Database & Queries',
+    file: '/handbooks/sql-handbook.pdf'
+  },
+  {
+    title: 'Python Handbook',
+    description: 'Explore Python basics, syntax, data structures and useful data analysis concepts.',
+    category: 'Programming & Analysis',
+    file: '/handbooks/python-handbook.pdf'
+  },
+  {
+    title: 'Power BI Handbook',
+    description: 'Understand Power BI, data modelling, DAX, visualizations and dashboards.',
+    category: 'Business Intelligence',
+    file: '/handbooks/power-bi-handbook.pdf'
+  },
+  {
+    title: 'Data Analyst Handbook',
+    description: 'Revise essential Data Analyst concepts, workflow, skills and interview topics.',
+    category: 'Career & Data Analytics',
+    file: '/handbooks/data-analyst-handbook.pdf'
+  }
+];
+
 const safeText = (value: unknown, fallback = ''): string => {
   if (value === null || value === undefined) return fallback;
 
   if (typeof value === 'string') return value;
+
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
   }
@@ -37,7 +73,6 @@ const safeText = (value: unknown, fallback = ''): string => {
   return fallback;
 };
 
-// Safely convert arrays, strings, or objects into string arrays.
 const toTextArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value
@@ -61,10 +96,10 @@ const toTextArray = (value: unknown): string[] => {
   return [];
 };
 
-// Safely read arrays from localStorage.
 const readStorageArray = (key: string): string[] => {
   try {
     const value = JSON.parse(localStorage.getItem(key) || '[]');
+
     return Array.isArray(value)
       ? value.filter(item => typeof item === 'string')
       : [];
@@ -87,7 +122,10 @@ export default function Hub() {
   const [copied, setCopied] = useState(false);
   const [sort, setSort] = useState('Popular');
 
-  // Load saved preferences.
+  // Prevent saving default values before localStorage has loaded.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Load saved preferences after the component mounts.
   useEffect(() => {
     setFavourites(readStorageArray('dah-favourites'));
     setRecent(readStorageArray('dah-recent'));
@@ -97,10 +135,14 @@ export default function Hub() {
     } catch {
       setDark(false);
     }
+
+    setHydrated(true);
   }, []);
 
-  // Save favourites.
+  // Save favourites only after initial loading.
   useEffect(() => {
+    if (!hydrated) return;
+
     try {
       localStorage.setItem(
         'dah-favourites',
@@ -109,10 +151,12 @@ export default function Hub() {
     } catch {
       // Ignore storage errors.
     }
-  }, [favourites]);
+  }, [favourites, hydrated]);
 
   // Save recently viewed references.
   useEffect(() => {
+    if (!hydrated) return;
+
     try {
       localStorage.setItem(
         'dah-recent',
@@ -121,10 +165,12 @@ export default function Hub() {
     } catch {
       // Ignore storage errors.
     }
-  }, [recent]);
+  }, [recent, hydrated]);
 
   // Save theme.
   useEffect(() => {
+    if (!hydrated) return;
+
     try {
       localStorage.setItem(
         'dah-theme',
@@ -133,7 +179,7 @@ export default function Hub() {
     } catch {
       // Ignore storage errors.
     }
-  }, [dark]);
+  }, [dark, hydrated]);
 
   // Keyboard shortcuts.
   useEffect(() => {
@@ -168,6 +214,7 @@ export default function Hub() {
     );
 
     setView('Dashboard');
+    setMobileOpen(false);
   };
 
   // Add or remove favourites.
@@ -193,7 +240,7 @@ export default function Hub() {
     }
   };
 
-  // Search and filter references safely.
+  // Search and filter references.
   const filtered = useMemo(() => {
     let data = [...references];
 
@@ -206,7 +253,7 @@ export default function Hub() {
           (a, b) =>
             recent.indexOf(a.id) - recent.indexOf(b.id)
         );
-    } else if (view !== 'Dashboard') {
+    } else if (view !== 'Dashboard' && view !== 'Handbooks') {
       data = data.filter(r => r.subject === view);
     }
 
@@ -276,7 +323,7 @@ export default function Hub() {
   const isHome = view === 'Dashboard' && !query && !selected;
   const darkClass = dark ? 'dark' : '';
 
-  // Safely normalize the currently selected reference.
+  // Selected reference details.
   const selectedTags = selected
     ? toTextArray(selected.tags)
     : [];
@@ -326,18 +373,23 @@ export default function Hub() {
         </div>
       </div>
 
+      {/* DASHBOARD */}
+
       <button
         className={`nav-item ${view === 'Dashboard' ? 'active' : ''}`}
         onClick={() => {
           setView('Dashboard');
           setQuery('');
           setSelected(null);
+          setSubjectFilter('All subjects');
           setMobileOpen(false);
         }}
       >
         <Home size={17} />
         Dashboard
       </button>
+
+      {/* LIBRARY */}
 
       <div className="nav-label">LIBRARY</div>
 
@@ -365,6 +417,61 @@ export default function Hub() {
         </button>
       ))}
 
+      {/* HANDBOOKS SECTION */}
+
+      <button
+        type="button"
+        className="nav-label space-top handbook-heading"
+        onClick={() => {
+          setView('Handbooks');
+          setQuery('');
+          setSelected(null);
+          setSubjectFilter('All subjects');
+          setMobileOpen(false);
+        }}
+        style={{
+          width: '100%',
+          border: 'none',
+          background: 'transparent',
+          textAlign: 'left',
+          cursor: 'pointer',
+          font: 'inherit'
+        }}
+      >
+        HANDBOOKS
+        <span className="nav-count" style={{ float: 'right' }}>
+          {handbooks.length}
+        </span>
+      </button>
+
+      {handbooks.map(book => (
+        <a
+          key={book.file}
+          className="nav-item handbook-nav-item"
+          href={book.file}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setMobileOpen(false)}
+          title={`Open ${book.title}`}
+          style={{
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}
+        >
+          <FileText size={17} />
+
+          <span style={{ flex: 1 }}>
+            {book.title}
+          </span>
+
+          <ExternalLink size={13} />
+        </a>
+      ))}
+
+      {/* YOUR SPACE */}
+
       <div className="nav-label space-top">YOUR SPACE</div>
 
       <button
@@ -373,12 +480,16 @@ export default function Hub() {
           setView('Favourites');
           setQuery('');
           setSelected(null);
+          setSubjectFilter('All subjects');
           setMobileOpen(false);
         }}
       >
         <Star size={17} />
         Favourites
-        <span className="nav-count">{favourites.length}</span>
+
+        <span className="nav-count">
+          {favourites.length}
+        </span>
       </button>
 
       <button
@@ -387,12 +498,15 @@ export default function Hub() {
           setView('Recently viewed');
           setQuery('');
           setSelected(null);
+          setSubjectFilter('All subjects');
           setMobileOpen(false);
         }}
       >
         <Clock3 size={17} />
         Recently viewed
       </button>
+
+      {/* SIDEBAR FOOTER */}
 
       <div className="sidebar-bottom">
         <div className="sidebar-tip">
@@ -413,9 +527,13 @@ export default function Hub() {
 
   return (
     <div className={`${darkClass} app-shell`}>
+      {/* DESKTOP SIDEBAR */}
+
       <aside className="sidebar">
         {sidebar}
       </aside>
+
+      {/* MOBILE SIDEBAR */}
 
       {mobileOpen && (
         <div
@@ -439,6 +557,8 @@ export default function Hub() {
       )}
 
       <main className="main-area">
+        {/* TOPBAR */}
+
         <header className="topbar">
           <button
             className="mobile-menu"
@@ -547,7 +667,9 @@ export default function Hub() {
                     </div>
 
                     <pre>
-                      <code>{safeText(selected.syntax, 'No syntax available.')}</code>
+                      <code>
+                        {safeText(selected.syntax, 'No syntax available.')}
+                      </code>
                     </pre>
                   </section>
 
@@ -715,9 +837,177 @@ export default function Hub() {
                 </div>
               </div>
             </>
+          ) : view === 'Handbooks' ? (
+
+            /* HANDBOOKS OVERVIEW PAGE */
+
+            <>
+              <div className="hero">
+                <div className="hero-copy">
+                  <div className="eyebrow">
+                    <span className="eyebrow-star">✦</span>
+                    LEARN · REVISE · GROW
+                  </div>
+
+                  <h1>Your Learning Handbooks.</h1>
+
+                  <p>
+                    Keep essential Data Analyst learning resources in one place.
+                    Open a handbook online or download it for later reference.
+                  </p>
+                </div>
+
+                <div className="hero-decoration">
+                  <div className="deco-card deco-one">
+                    <span>PDF</span>
+                    <small>LEARN</small>
+                  </div>
+
+                  <div className="deco-card deco-two">
+                    <span>{'{ }'}</span>
+                    <small>PRACTICE</small>
+                  </div>
+
+                  <div className="deco-card deco-three">
+                    <span>↗</span>
+                    <small>GROW</small>
+                  </div>
+
+                  <div className="deco-orbit" />
+                </div>
+              </div>
+
+              <div className="section-title-row">
+                <div>
+                  <div className="eyebrow">YOUR PDF LIBRARY</div>
+                  <h2>Available Handbooks</h2>
+                </div>
+
+                <span className="subtle-count">
+                  {handbooks.length} PDF resources
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+                  gap: '18px',
+                  marginTop: '22px'
+                }}
+              >
+                {handbooks.map(book => (
+                  <article
+                    key={book.file}
+                    className="panel"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: '250px',
+                      padding: '22px',
+                      gap: '14px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'rgba(124, 92, 255, 0.12)'
+                      }}
+                    >
+                      <FileText size={25} />
+                    </div>
+
+                    <div>
+                      <div className="eyebrow">
+                        {book.category}
+                      </div>
+
+                      <h3 style={{ marginTop: '8px' }}>
+                        {book.title}
+                      </h3>
+
+                      <p className="muted" style={{ marginTop: '9px' }}>
+                        {book.description}
+                      </p>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '10px',
+                        marginTop: 'auto',
+                        paddingTop: '10px'
+                      }}
+                    >
+                      <a
+                        href={book.file}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '7px',
+                          padding: '10px 13px',
+                          borderRadius: '9px',
+                          textDecoration: 'none',
+                          background: '#7657e8',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          fontWeight: 600
+                        }}
+                      >
+                        <ExternalLink size={15} />
+                        View PDF
+                      </a>
+
+                      <a
+                        href={book.file}
+                        download
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '7px',
+                          padding: '10px 13px',
+                          borderRadius: '9px',
+                          textDecoration: 'none',
+                          border: '1px solid var(--border, #dddddd)',
+                          color: 'inherit',
+                          fontSize: '13px',
+                          fontWeight: 600
+                        }}
+                      >
+                        <Download size={15} />
+                        Download
+                      </a>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="panel" style={{ marginTop: '24px', padding: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <BookOpen size={20} />
+                  <h3>Learning tip</h3>
+                </div>
+
+                <p className="muted" style={{ marginTop: '8px' }}>
+                  Use these handbooks for quick revision while practising Excel,
+                  SQL, Python and Power BI. Download a PDF when you want to keep
+                  a local copy on your device.
+                </p>
+              </div>
+            </>
           ) : (
 
-            /* DASHBOARD AND LIBRARY */
+            /* DASHBOARD AND REFERENCE LIBRARY */
 
             <>
               <div className="hero">
@@ -814,6 +1104,7 @@ export default function Hub() {
                         onClick={() => {
                           setView(s.name);
                           setSelected(null);
+                          setSubjectFilter('All subjects');
                         }}
                       >
                         <div className={`subject-icon ${s.color}`}>
