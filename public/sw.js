@@ -1,10 +1,17 @@
 
-const CACHE_NAME = 'dataanalyst-hub-v1';
+const CACHE_NAME = 'dataanalyst-hub-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.add('/icon.svg'))
+    caches.open(CACHE_NAME).then((cache) =>
+      cache.addAll([
+        '/',
+        '/icon.svg',
+        '/manifest.webmanifest'
+      ])
+    )
   );
+
   self.skipWaiting();
 });
 
@@ -18,6 +25,7 @@ self.addEventListener('activate', (event) => {
       )
     )
   );
+
   self.clients.claim();
 });
 
@@ -27,25 +35,59 @@ self.addEventListener('fetch', (event) => {
 
   if (
     request.method !== 'GET' ||
-    url.origin !== self.location.origin ||
-    !url.pathname.startsWith('/_next/static/')
+    url.origin !== self.location.origin
   ) {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
+  // Cache website page for offline use
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
 
-      return fetch(request).then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          event.waitUntil(
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
+            event.waitUntil(
+              caches.open(CACHE_NAME).then((cache) =>
+                cache.put('/', copy)
+              )
+            );
+          }
+
+          return response;
+        })
+        .catch(async () => {
+          return (
+            await caches.match(request) ||
+            await caches.match('/')
           );
-        }
-        return response;
-      });
-    })
-  );
+        })
+    );
+
+    return;
+  }
+
+  // Cache Next.js static files
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+
+            event.waitUntil(
+              caches.open(CACHE_NAME).then((cache) =>
+                cache.put(request, copy)
+              )
+            );
+          }
+
+          return response;
+        });
+      })
+    );
+  }
 });
